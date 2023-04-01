@@ -7,6 +7,8 @@ completely shorted out all the electronics. Since I have a variety of ESP style
 microcontrollers on hand, I swapped out the insides and just kept the motor and
 body parts.
 
+![put_together](https://user-images.githubusercontent.com/2414/229307568-13fe0252-c59c-4923-aad0-e9e78bac8b04.jpg)
+
 ## Parts
 
 Pieces:
