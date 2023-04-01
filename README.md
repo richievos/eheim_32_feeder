@@ -17,6 +17,8 @@ Pieces:
 
 ## Wiring instructions
 
+![hardware layout](hardware/Layout.png)
+
 **Motor and transistor:**
 The motor has 2 wires, red and black.
 
