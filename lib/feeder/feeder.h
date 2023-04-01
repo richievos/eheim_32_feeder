@@ -21,7 +21,10 @@ struct MotorPins {
 RotationSensorPins nsRotationSensorPins;
 MotorPins nsMotorPins;
 
-const unsigned int sleepPeriodBetweenRotationsMS = 500;
+const unsigned int sleepPeriodBetweenRotationsMS = 100;
+const unsigned long DEBOUNCE_INTERVAL_MS = 300;
+// const unsigned long DEBOUNCE_INTERVAL_MS = 1000;
+
 
 /************************
  * State
@@ -132,7 +135,7 @@ void setupFeeder(const RotationSensorPins rotationSensorPins, const MotorPins mo
     pinMode(motorPins.powerOutput, OUTPUT);
 
     pinMode(rotationSensorPins.input, INPUT_PULLUP);
-    rotationInput = std::make_unique<Debounce>(rotationSensorPins.input, 40, true);
+    rotationInput = std::make_unique<Debounce>(rotationSensorPins.input, DEBOUNCE_INTERVAL_MS, true);
 
     nsRotationSensorPins = rotationSensorPins;
     nsMotorPins = motorPins;
@@ -157,17 +160,17 @@ void loopFeeder(const unsigned long loopStartedAt) {
     }
     wasRotating = curInRotation;
 
-    if (curTimeSlice != lastTimeSlice || justFinishedRotation) {
-        Serial.print("rotationInput->read(): ");
-        Serial.println(rotationInput->read());
-        Serial.print("digitalRead: ");
-        Serial.println(digitalRead(nsRotationSensorPins.input));
+    // if (curTimeSlice != lastTimeSlice || justFinishedRotation) {
+    //     Serial.print("rotationInput->read(): ");
+    //     Serial.println(rotationInput->read());
+    //     Serial.print("digitalRead: ");
+    //     Serial.println(digitalRead(nsRotationSensorPins.input));
 
-        Serial.print("curInRotation: ");
-        Serial.println(curInRotation);
-        Serial.print("justFinishedRotation: ");
-        Serial.println(justFinishedRotation);
-    }
+    //     Serial.print("curInRotation: ");
+    //     Serial.println(curInRotation);
+    //     Serial.print("justFinishedRotation: ");
+    //     Serial.println(justFinishedRotation);
+    // }
 
     lastTimeSlice = curTimeSlice;
 }
