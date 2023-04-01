@@ -86,6 +86,10 @@ class Rotator {
 std::unique_ptr<Rotator> rotator = nullptr;
 std::unique_ptr<Debounce> rotationInput = nullptr;
 
+bool isInFeed() {
+    return rotator != nullptr;
+}
+
 bool isInRotation() {
     // default to saying we're in a rotation so that we fail thinking we're feeding
     if (rotationInput == nullptr) {
@@ -93,16 +97,17 @@ bool isInRotation() {
         return true;
     }
 
-    return rotationInput->read() == LOW;
-    // const int rotationSensorVal = digitalRead(nsRotationSensorPins.input);
-
-    // return rotationSensorVal == 0;
+    return rotationInput->read();
 }
 
-std::unique_ptr<Rotator> beginFeed(const int rotationCount, unsigned long startedAt) {
-    rotator = std::make_unique<Rotator>(2, startedAt, nsMotorPins);
-    rotator->startup();
-    return std::move(rotator);
+void beginFeed(const int rotationCount, unsigned long startedAt) {
+    if (rotator != nullptr) {
+        Serial.println("Refusing to create a new rotator when one is already in flight");
+    }
+    auto newRotator = std::make_unique<Rotator>(rotationCount, startedAt, nsMotorPins);
+    newRotator->startup();
+
+    rotator = std::move(newRotator);
 }
 
 void finishFeed(const unsigned long loopStartedAt) {
@@ -127,13 +132,10 @@ void setupFeeder(const RotationSensorPins rotationSensorPins, const MotorPins mo
     pinMode(motorPins.powerOutput, OUTPUT);
 
     pinMode(rotationSensorPins.input, INPUT_PULLUP);
-    rotationInput = std::make_unique<Debounce>(rotationSensorPins.input, 10, true);
+    rotationInput = std::make_unique<Debounce>(rotationSensorPins.input, 40, true);
 
     nsRotationSensorPins = rotationSensorPins;
     nsMotorPins = motorPins;
-
-    // TODO: temporary
-    rotator = beginFeed(2, 0);
 }
 
 void loopFeeder(const unsigned long loopStartedAt) {
@@ -141,7 +143,7 @@ void loopFeeder(const unsigned long loopStartedAt) {
 
     const bool curInRotation = isInRotation();
     const bool justFinishedRotation = wasRotating && !curInRotation;
-    if (justFinishedRotation) {
+    if (justFinishedRotation && rotator) {
         rotator->finishedARotation();
 
         rotator->pause();
@@ -149,26 +151,23 @@ void loopFeeder(const unsigned long loopStartedAt) {
 
         if (rotator->isDone()) {
             finishFeed(loopStartedAt);
-
-            // TODO: temp
-            rotator = beginFeed(3, loopStartedAt);
         } else {
             rotator->go();
         }
     }
     wasRotating = curInRotation;
 
-    // if (curTimeSlice != lastTimeSlice || justFinishedRotation) {
-    //     Serial.print("rotationInput->read(): ");
-    //     Serial.println(rotationInput->read());
-    //     Serial.print("digitalRead: ");
-    //     Serial.println(digitalRead(nsRotationSensorPins.input));
+    if (curTimeSlice != lastTimeSlice || justFinishedRotation) {
+        Serial.print("rotationInput->read(): ");
+        Serial.println(rotationInput->read());
+        Serial.print("digitalRead: ");
+        Serial.println(digitalRead(nsRotationSensorPins.input));
 
-    //     Serial.print("curInRotation: ");
-    //     Serial.println(curInRotation);
-    //     Serial.print("justFinishedRotation: ");
-    //     Serial.println(justFinishedRotation);
-    // }
+        Serial.print("curInRotation: ");
+        Serial.println(curInRotation);
+        Serial.print("justFinishedRotation: ");
+        Serial.println(justFinishedRotation);
+    }
 
     lastTimeSlice = curTimeSlice;
 }
