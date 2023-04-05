@@ -27,7 +27,7 @@ void setup() {
     Serial.begin(115200);
 
     richiev::connectWifi(hostname, wifiSSID, wifiPassword);
-    setupController(mqttBroker, mqttClient);
+    controller::setupController(mqttBroker, mqttClient);
 
     setupFeeder(rotationSensorPins, motorPins);
 
@@ -43,6 +43,7 @@ void loop() {
     // don't want networking to affect food being dumped in
     if (!isInFeed()) {
         richiev::mqtt::loopMQTT(mqttBroker, feeder::mqttClient);
+        controller::loopController();
 
         ntp::loopNTP();
     }
