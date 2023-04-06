@@ -1,32 +1,38 @@
 // based on https://github.com/PaulStoffregen/Time/blob/master/examples/TimeNTP_ESP8266WiFi/TimeNTP_ESP8266WiFi.ino
 #pragma once
 
+#include <memory>
+
 #include <NTPClient.h>
 
 namespace ntp {
-WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP);
 
-void setupNTP() {
+WiFiUDP ntpUDP;
+
+std::unique_ptr<NTPClient> setupNTP() {
+    auto timeClient = std::make_unique<NTPClient>(ntpUDP);
+
     Serial.println("Setting up ntp client");
-    timeClient.setUpdateInterval(1000 * 60 * 30);
-    timeClient.begin();
-    timeClient.setTimeOffset(0);
+    timeClient->setUpdateInterval(1000 * 60 * 30);
+    timeClient->begin();
+    timeClient->setTimeOffset(0);
 
     const int num_tries = 5;
-    for (int i = 0; i < num_tries && !timeClient.update(); i++) {
-        timeClient.forceUpdate();
+    for (int i = 0; i < num_tries && !timeClient->update(); i++) {
+        timeClient->forceUpdate();
         delay(1000);
     }
 
     Serial.println("Current time: ");
-    Serial.println(timeClient.getFormattedTime());
+    Serial.println(timeClient->getFormattedTime());
+
+    return std::move(timeClient);
 }
 
-void loopNTP() {
+void loopNTP(std::shared_ptr<NTPClient> timeClient) {
     // this will trigger a time refresh if needed
     // WARNING: this is sync and blocking
-    timeClient.update();
+    timeClient->update();
 }
 
 }  // namespace ntp

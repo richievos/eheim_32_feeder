@@ -1,5 +1,5 @@
 #include <Arduino.h>
-#include <TimeLib.h>
+#include <NTPClient.h>
 
 #include "feeder.h"
 #include "mqtt.h"
@@ -17,6 +17,8 @@ namespace feeder {
 MqttBroker mqttBroker(MQTT_BROKER_PORT);
 MqttClient mqttClient(&mqttBroker);
 
+std::shared_ptr<NTPClient> timeClient;
+
 RotationSensorPins rotationSensorPins = {
     .input = 23};
 
@@ -32,20 +34,20 @@ void setup() {
     setupFeeder(rotationSensorPins, motorPins);
 
     // trigger a NTP refresh
-    ntp::setupNTP();
+    timeClient = std::move(ntp::setupNTP());
 }
 
 void loop() {
-    const unsigned long loopStartedAt = millis();
-    loopFeeder(loopStartedAt);
+    const unsigned long loopStartedAt = timeClient->getEpochTime();
+    loopFeeder(timeClient, loopStartedAt);
 
     // Don't run this when the feeder is going, because this blocks and I
     // don't want networking to affect food being dumped in
     if (!isInFeed()) {
         richiev::mqtt::loopMQTT(mqttBroker, feeder::mqttClient);
-        controller::loopController();
+        controller::loopController(timeClient);
 
-        ntp::loopNTP();
+        ntp::loopNTP(timeClient);
     }
 }
 }  // namespace feeder

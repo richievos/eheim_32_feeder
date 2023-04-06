@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include <NTPClient.h>
 
 #include <memory>
 
@@ -41,9 +42,7 @@ class Rotator {
    public:
     Rotator(int rotationCount, unsigned long startedAt, const MotorPins motorPins, unsigned long expectedRotationDuration) : _rotationCount(rotationCount), _startedAt(startedAt), _motorPins(motorPins), _expectedRotationDuration(expectedRotationDuration){};
 
-    bool finishedARotation() {
-        auto endedAt = millis();
-
+    bool finishedARotation(const unsigned long endedAt) {
         Serial.print("Finished a rotation (");
         Serial.print(_numRotationsDone + 1);
         Serial.print(") out of (");
@@ -76,16 +75,6 @@ class Rotator {
         digitalWrite(_motorPins.powerOutput, HIGH);
     }
 
-    void startup(unsigned long asOf) {
-        Serial.print("Beginning a feed! rotationCount=");
-        Serial.print(_rotationCount);
-        Serial.print(", startedAt=");
-        Serial.print(_startedAt);
-        Serial.println();
-
-        go(asOf);
-    }
-
     void pause() {
         digitalWrite(_motorPins.powerOutput, LOW);
     }
@@ -98,14 +87,7 @@ class Rotator {
         return asOfMS - _currentRotationStartAt;
     }
 
-    void shutdown(unsigned long asOf) {
-        Serial.print("Finished a feed!");
-        Serial.print(" duration=");
-        Serial.print(asOf - _startedAt);
-        Serial.println();
-
-        pause();
-    }
+    unsigned long getStartedAt() { return _startedAt; }
 
    private:
     const int _rotationCount;
@@ -135,26 +117,37 @@ bool isInRotation() {
     return rotationInput->read();
 }
 
-void beginFeed(const int rotationCount) {
+void beginFeed(const unsigned long rotationStartedAt, const int rotationCount) {
     if (rotator != nullptr) {
         Serial.println("Refusing to create a new rotator when one is already in flight");
     }
-    unsigned long startedAt = millis();
-    auto newRotator = std::make_unique<Rotator>(rotationCount, startedAt, nsMotorPins, APPROXIMATE_ROTATION_DURATION_MS);
-    newRotator->startup(startedAt);
+    auto newRotator = std::make_unique<Rotator>(rotationCount, rotationStartedAt, nsMotorPins, APPROXIMATE_ROTATION_DURATION_MS);
+
+    Serial.print("Beginning a feed! rotationCount=");
+    Serial.print(rotationCount);
+    Serial.print(", rotationStartedAt=");
+    Serial.print(rotationStartedAt);
+    Serial.println();
+
+    newRotator->go(rotationStartedAt);
 
     rotator = std::move(newRotator);
 }
 
-void finishFeed(const unsigned long loopStartedAt) {
-    if (rotator) rotator->shutdown(loopStartedAt);
+void finishFeed(const unsigned long finishTime) {
+    if (rotator) {
+        Serial.print("Finished a feed!");
+        Serial.print(" duration=");
+        Serial.print(finishTime - rotator->getStartedAt());
+        Serial.println();
+    }
     rotator = nullptr;
 
     if (rotationInput) {
         Serial.print("Total rotations since reboot: rotation_count=");
         Serial.print(rotationInput->read());
         Serial.print(", time_since_reboot=");
-        Serial.print(loopStartedAt);
+        Serial.print(finishTime);
         Serial.println();
     }
 }
@@ -175,7 +168,7 @@ void setupFeeder(const RotationSensorPins rotationSensorPins, const MotorPins mo
 
 unsigned long continueAt = 0;
 
-void loopFeeder(const unsigned long loopStartedAt) {
+void loopFeeder(std::shared_ptr<NTPClient> timeClient, const unsigned long loopStartedAt) {
     const int curTimeSlice = loopStartedAt / 300;
 
     const bool curInRotation = isInRotation();
@@ -184,12 +177,13 @@ void loopFeeder(const unsigned long loopStartedAt) {
     if (rotator) {
         if (continueAt != 0 && continueAt <= loopStartedAt) {
             continueAt = 0;
-            rotator->go(millis());
+            rotator->go(timeClient->getEpochTime());
         } else {
-            if (!justFinishedRotation && rotator->shouldHaveFinishedARotation(loopStartedAt)) {
+            auto finishTime = timeClient->getEpochTime();
+            if (!justFinishedRotation && rotator->shouldHaveFinishedARotation(finishTime)) {
                 Serial.print("WARNING: based on time should have finished a rotation but didn't. Forcing a rotation finish to avoid infinitely dropping food.");
                 Serial.print(" duration=");
-                Serial.print(rotator->currentRotationDuration(loopStartedAt));
+                Serial.print(rotator->currentRotationDuration(finishTime));
                 Serial.print(", expected_duration<=");
                 Serial.print(APPROXIMATE_ROTATION_DURATION_MS);
                 Serial.println();
@@ -198,14 +192,14 @@ void loopFeeder(const unsigned long loopStartedAt) {
             }
 
             if (justFinishedRotation) {
-                rotator->finishedARotation();
+                rotator->finishedARotation(finishTime);
 
                 rotator->pause();
 
                 if (rotator->isDone()) {
-                    finishFeed(loopStartedAt);
+                    finishFeed(finishTime);
                 } else {
-                    continueAt = loopStartedAt + sleepPeriodBetweenRotationsMS;
+                    continueAt = finishTime + sleepPeriodBetweenRotationsMS;
                 }
             }
         }

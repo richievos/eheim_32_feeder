@@ -1,4 +1,7 @@
 #pragma once
+
+#include <NTPClient.h>
+
 #include <memory>
 
 #include "feeder.h"
@@ -19,7 +22,7 @@ void triggerFeed(const unsigned long asOf, const unsigned int rotations) {
         Serial.print(lastFeedAsOf);
         Serial.println();
     } else {
-        feeder::beginFeed(rotations);
+        feeder::beginFeed(asOf, rotations);
     }
 }
 
@@ -49,11 +52,11 @@ void setupController(MqttBroker& mqttBroker, MqttClient& mqttClient) {
     richiev::mqtt::setupMQTT(mqttBroker, mqttClient, handlers);
 }
 
-void loopController() {
+void loopController(std::shared_ptr<NTPClient> timeClient) {
     web_server::loopWebServer();
     auto pendingFeed = web_server::retrievePendingFeedRequest();
     if (pendingFeed) {
-        triggerFeed(pendingFeed->asOf, pendingFeed->rotations);
+        triggerFeed(timeClient->getEpochTime(), pendingFeed->rotations);
     }
 }
 }  // namespace controller
