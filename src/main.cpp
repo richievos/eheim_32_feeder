@@ -39,13 +39,13 @@ void setup() {
 
 void loop() {
     const unsigned long loopStartedAt = timeClient->getEpochTime();
-    loopFeeder(timeClient, loopStartedAt);
+    loopFeeder(loopStartedAt);
 
     // Don't run this when the feeder is going, because this blocks and I
     // don't want networking to affect food being dumped in
     if (!isInFeed()) {
         richiev::mqtt::loopMQTT(mqttBroker, feeder::mqttClient);
-        controller::loopController(timeClient);
+        controller::loopController();
 
         ntp::loopNTP(timeClient);
     }

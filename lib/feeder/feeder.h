@@ -1,7 +1,6 @@
 #pragma once
 
 #include <Arduino.h>
-#include <NTPClient.h>
 
 #include <memory>
 
@@ -168,7 +167,7 @@ void setupFeeder(const RotationSensorPins rotationSensorPins, const MotorPins mo
 
 unsigned long continueAt = 0;
 
-void loopFeeder(std::shared_ptr<NTPClient> timeClient, const unsigned long loopStartedAt) {
+void loopFeeder(const unsigned long loopStartedAt) {
     const int curTimeSlice = loopStartedAt / 300;
 
     const bool curInRotation = isInRotation();
@@ -177,9 +176,9 @@ void loopFeeder(std::shared_ptr<NTPClient> timeClient, const unsigned long loopS
     if (rotator) {
         if (continueAt != 0 && continueAt <= loopStartedAt) {
             continueAt = 0;
-            rotator->go(timeClient->getEpochTime());
+            rotator->go(millis());
         } else {
-            auto finishTime = timeClient->getEpochTime();
+            auto finishTime = millis();
             if (!justFinishedRotation && rotator->shouldHaveFinishedARotation(finishTime)) {
                 Serial.print("WARNING: based on time should have finished a rotation but didn't. Forcing a rotation finish to avoid infinitely dropping food.");
                 Serial.print(" duration=");
