@@ -5,6 +5,7 @@
 #include "mqtt.h"
 #include "mywifi.h"
 #include "ntp.h"
+#include "ota.h"
 #include "controller.h"
 
 // pull in all the inputs last to make sure they're only being referenced from here
@@ -29,6 +30,7 @@ void setup() {
     Serial.begin(115200);
 
     richiev::connectWifi(hostname, wifiSSID, wifiPassword);
+    richiev::ota::setupOTA(hostname);
     controller::setupController(mqttBroker, mqttClient);
 
     setupFeeder(rotationSensorPins, motorPins);
@@ -48,6 +50,7 @@ void loop() {
         controller::loopController();
 
         ntp::loopNTP(timeClient);
+        richiev::ota::loopOTA();
     }
 }
 }  // namespace feeder
