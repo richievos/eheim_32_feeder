@@ -31,12 +31,12 @@ void setup() {
 
     richiev::connectWifi(hostname, wifiSSID, wifiPassword);
     richiev::ota::setupOTA(hostname);
-    controller::setupController(mqttBroker, mqttClient);
-
-    setupFeeder(rotationSensorPins, motorPins);
 
     // trigger a NTP refresh
     timeClient = std::move(ntp::setupNTP());
+
+    controller::setupController(mqttBroker, mqttClient, timeClient);
+    setupFeeder(rotationSensorPins, motorPins);
 }
 
 void loop() {

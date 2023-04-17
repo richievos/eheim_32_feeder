@@ -39,7 +39,7 @@ unsigned long lastTimeSlice = 0;
  ************************/
 class Rotator {
    public:
-    Rotator(int rotationCount, unsigned long startedAt, const MotorPins motorPins, unsigned long expectedRotationDuration) : _rotationCount(rotationCount), _startedAt(startedAt), _motorPins(motorPins), _expectedRotationDuration(expectedRotationDuration){};
+    Rotator(unsigned int rotationCount, unsigned long startedAt, const unsigned long adjustedStartedAtSec, const MotorPins motorPins, unsigned long expectedRotationDuration) : _rotationCount(rotationCount), _startedAt(startedAt), _adjustedStartedAtSec(adjustedStartedAtSec), _motorPins(motorPins), _expectedRotationDuration(expectedRotationDuration){};
 
     bool finishedARotation(const unsigned long endedAt) {
         Serial.print("Finished a rotation (");
@@ -86,16 +86,19 @@ class Rotator {
         return asOfMS - _currentRotationStartAt;
     }
 
-    unsigned long getStartedAt() { return _startedAt; }
+    const unsigned long getStartedAt() { return _startedAt; }
+
+    const unsigned long getAdjustedStartedAtSec() { return _adjustedStartedAtSec; }
 
    private:
-    const int _rotationCount;
+    const unsigned int _rotationCount;
     const unsigned long _startedAt;
+    const unsigned long _adjustedStartedAtSec;
     const unsigned long _expectedRotationDuration;
     const MotorPins _motorPins;
 
-    int _numRotationsDone = 0;
-    int _currentRotationStartAt = 0;
+    unsigned int _numRotationsDone = 0;
+    unsigned long _currentRotationStartAt = 0;
     bool hasStarted = false;
 };
 
@@ -116,16 +119,18 @@ bool isInRotation() {
     return rotationInput->read();
 }
 
-void beginFeed(const unsigned long rotationStartedAt, const int rotationCount) {
+void beginFeed(const unsigned long rotationStartedAt, const unsigned long adjustedStartedAtSec, const int rotationCount) {
     if (rotator != nullptr) {
         Serial.println("Refusing to create a new rotator when one is already in flight");
     }
-    auto newRotator = std::make_unique<Rotator>(rotationCount, rotationStartedAt, nsMotorPins, APPROXIMATE_ROTATION_DURATION_MS);
+    auto newRotator = std::make_unique<Rotator>(rotationCount, rotationStartedAt, adjustedStartedAtSec, nsMotorPins, APPROXIMATE_ROTATION_DURATION_MS);
 
     Serial.print("Beginning a feed! rotationCount=");
     Serial.print(rotationCount);
     Serial.print(", rotationStartedAt=");
     Serial.print(rotationStartedAt);
+    Serial.print(", adjustedStartedAtSec=");
+    Serial.print(adjustedStartedAtSec);
     Serial.println();
 
     newRotator->go(rotationStartedAt);

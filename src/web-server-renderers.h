@@ -1,5 +1,6 @@
 #pragma once
 
+#include <ctime>
 #include <list>
 #include <string>
 
@@ -7,6 +8,16 @@
 
 namespace feeder {
 namespace web_server {
+
+std::string renderTime(char *temp, size_t bufferSize, const unsigned long timeInSec) {
+    // millis to time
+    const time_t rawtime = (time_t)timeInSec;
+    struct tm *dt = gmtime(&rawtime);
+
+    // format
+    strftime(temp, bufferSize, "%Y-%m-%d %H:%M:%S", dt);
+    return temp;
+}
 
 std::string renderFooter(char *temp, size_t bufferSize) {
     unsigned long time = millis();
@@ -42,7 +53,29 @@ std::string renderForm(char *temp, size_t bufferSize, unsigned long asOf) {
     return temp;
 }
 
-void renderRoot(std::string &out, std::string triggered) {
+std::string renderMeasurementList(char *temp, size_t bufferSize, const std::vector<std::reference_wrapper<feeder::Feeding>> &mostRecentFeedings) {
+    std::string measurementString = R"(<section class="row mt-3"><div class="col"><table class="table table-striped">)";
+    const auto alkMeasureTemplate = R"(
+      <tr class="measurement">
+        <td class="asOfAdjustedSec converted-time" data-epoch-sec="%lu">%s</td>
+        <td class="rotations">%u</td>
+      </tr>
+    )";
+    for (auto &feedingRef : mostRecentFeedings) {
+        auto &feeding = feedingRef.get();
+        if (feeding.asOfAdjustedSec != 0) {
+            snprintf(temp, bufferSize, alkMeasureTemplate,
+                     feeding.asOfAdjustedSec,
+                     renderTime(temp, bufferSize, feeding.asOfAdjustedSec).c_str(),
+                     feeding.rotations);
+            measurementString += temp;
+        }
+    }
+    measurementString += "</table></div></section>";
+    return measurementString;
+}
+
+void renderRoot(std::string &out, const std::string &triggered, const std::vector<std::reference_wrapper<feeder::Feeding>> &mostRecentFeedings) {
     std::string triggeredContent = "";
     if (triggered == "true") {
         triggeredContent = R"(<section class="alert alert-success">Successfully triggered a feed!</section>)";
@@ -75,9 +108,22 @@ void renderRoot(std::string &out, std::string triggered) {
     out += triggeredContent;
 
     out += renderForm(temp, bufferSize, millis());
+    out += renderMeasurementList(temp, bufferSize, mostRecentFeedings);
     out += renderFooter(temp, bufferSize);
     out += R"(
     </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.4.slim.min.js" integrity="sha256-a2yjHM4jnF9f54xUQakjZGaqYs/V1CYvWpoqZzC2/Bw=" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ENjdO4Dr2bkBIFxQpeoTz1HIcje39Wm4jDKdf19U8gI4ddQ3GYNS7NTKfAdVQSZe" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/luxon/3.3.0/luxon.min.js" integrity="sha512-KKbQg5o92MwtJKR9sfm/HkREzfyzNMiKPIQ7i7SZOxwEdiNCm4Svayn2DBq7MKEdrqPJUOSIpy1v6PpFlCQ0YA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script>
+      $('.converted-time').each(function(index, item) {
+        const { DateTime } = luxon;
+        var epochSec = $(item).data("epoch-sec");
+        var timeString = DateTime.fromSeconds(epochSec).toFormat('yyyy-MM-dd HH:mm:ss');
+        $(item).text(timeString)
+      })
+    </script>
   </body>
 </html>
     )";
