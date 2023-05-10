@@ -1,8 +1,9 @@
 #pragma once
 
-#include <memory>
-
 #include <NTPClient.h>
+#include <nvs_flash.h>
+
+#include <memory>
 
 #include "feeder.h"
 #include "feeding-store.h"
@@ -28,16 +29,27 @@ void triggerFeed(const unsigned long asOf, const unsigned long adjustedTimeSec, 
     } else {
         const feeder::Feeding feeding = {
             .asOfAdjustedSec = adjustedTimeSec,
-            .rotations = rotations
-        };
+            .rotations = rotations};
         feeder::beginFeed(asOf, adjustedTimeSec, rotations);
         feedingStore->addFeeding(feeding);
+        feeding_store::persistFeedingStore(feedingStore);
     }
 }
 
 std::unique_ptr<richiev::mqtt::TopicProcessorMap> buildHandlers() {
     auto topicsToProcessorPtr = std::make_unique<richiev::mqtt::TopicProcessorMap>();
     auto& topicsToProcessor = *topicsToProcessorPtr;
+
+    topicsToProcessor["debug/restart"] = [&](const std::string& payload) {
+        Serial.println("Restarting");
+        ESP.restart();
+    };
+
+    topicsToProcessor["debug/clear"] = [&](const std::string& payload) {
+        Serial.println("Clearing settings out");
+        nvs_flash_erase();
+        nvs_flash_init();
+    };
 
     topicsToProcessor["execute/triggerFeed"] = [&](const std::string& payload) {
         auto doc = richiev::mqtt::parseInput(payload);
@@ -50,6 +62,7 @@ std::unique_ptr<richiev::mqtt::TopicProcessorMap> buildHandlers() {
 
         triggerFeed(asOf, timeClient->getEpochTime(), rotations);
     };
+
     Serial << "Initialized topic_processor_count=" << topicsToProcessor.size() << endl;
     return std::move(topicsToProcessorPtr);
 }
