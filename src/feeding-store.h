@@ -19,7 +19,7 @@ const char* PREFERENCE_NS = "feeder";
  ***********/
 Preferences preferences;
 
-const size_t FEEDINGS_TO_KEEP = 200;
+const size_t FEEDINGS_TO_KEEP = 50;
 
 // +1 to avoid inserting a null pointer at the beginning of the string
 const auto KEY_I_OFFSET = static_cast<unsigned char>(1);
